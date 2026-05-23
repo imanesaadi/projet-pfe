@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>PFE Shop</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; background: #f5f5f5; color: #333; }
+    header { background: #1a1a2e; color: white; padding: 16px 32px; display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 20px; }
+    .nav { display: flex; gap: 8px; margin-left: auto; }
+    .nav button { background: transparent; border: 1px solid rgba(255,255,255,0.3); color: white; padding: 6px 16px; border-radius: 20px; cursor: pointer; font-size: 13px; }
+    .nav button.active { background: white; color: #1a1a2e; }
+    .container { max-width: 960px; margin: 32px auto; padding: 0 16px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+    .card { background: white; border-radius: 12px; padding: 20px; border: 1px solid #eee; }
+    .card h3 { font-size: 15px; margin-bottom: 6px; }
+    .card p { font-size: 13px; color: #888; }
+    .price { font-size: 20px; font-weight: 600; color: #1a1a2e; margin-top: 10px; }
+    .btn { margin-top: 12px; width: 100%; padding: 8px; background: #1a1a2e; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; }
+    .btn:hover { background: #16213e; }
+    .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 20px; background: #e8f5e9; color: #2e7d32; margin-bottom: 8px; }
+    .status { display: flex; gap: 12px; margin-bottom: 24px; }
+    .stat { background: white; border-radius: 12px; padding: 16px 20px; flex: 1; border: 1px solid #eee; }
+    .stat span { display: block; font-size: 24px; font-weight: 600; }
+    .stat p { font-size: 12px; color: #888; margin-top: 4px; }
+    .order-form { background: white; border-radius: 12px; padding: 20px; border: 1px solid #eee; margin-bottom: 16px; }
+    .order-form h3 { margin-bottom: 14px; font-size: 15px; }
+    select, .order-form input { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; margin-bottom: 10px; }
+    .order-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+    .order-id { font-weight: 600; color: #1a1a2e; min-width: 30px; }
+    .order-status { font-size: 11px; padding: 2px 8px; border-radius: 20px; background: #fff3e0; color: #e65100; }
+    h2 { font-size: 18px; margin-bottom: 16px; }
+    .empty { text-align: center; color: #aaa; padding: 40px; font-size: 14px; }
+    .toast { position: fixed; bottom: 24px; right: 24px; background: #1a1a2e; color: white; padding: 12px 20px; border-radius: 10px; font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🛒 PFE Shop</h1>
+  <div class="nav">
+    <button class="active" onclick="showTab('products', this)">Produits</button>
+    <button onclick="showTab('users', this)">Utilisateurs</button>
+    <button onclick="showTab('orders', this)">Commandes</button>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="status">
+    <div class="stat"><span id="stat-products">...</span><p>Produits</p></div>
+    <div class="stat"><span id="stat-users">...</span><p>Utilisateurs</p></div>
+    <div class="stat"><span id="stat-orders">...</span><p>Commandes</p></div>
+  </div>
+
+  <!-- Produits -->
+  <div id="tab-products">
+    <h2>Catalogue produits</h2>
+    <div class="grid" id="products-grid"></div>
+  </div>
+
+  <!-- Utilisateurs -->
+  <div id="tab-users" style="display:none">
+    <h2>Utilisateurs</h2>
+    <div class="grid" id="users-grid"></div>
+  </div>
+
+  <!-- Commandes -->
+  <div id="tab-orders" style="display:none">
+    <h2>Nouvelle commande</h2>
+    <div class="order-form">
+      <select id="sel-user"><option value="">-- Choisir un utilisateur --</option></select>
+      <select id="sel-product"><option value="">-- Choisir un produit --</option></select>
+      <button class="btn" onclick="createOrder()">Passer la commande</button>
+    </div>
+    <h2>Commandes en cours</h2>
+    <div id="orders-list"></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = {
+  users:    'http://localhost:5001',
+  products: 'http://localhost:5002',
+  orders:   'http://localhost:5003'
+};
+
+async function fetchJSON(url) {
+  try { return await (await fetch(url)).json(); }
+  catch { return null; }
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function showTab(tab, btn) {
+  ['products','users','orders'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = 'none';
+  });
+  document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tab).style.display = 'block';
+  btn.classList.add('active');
+}
+
+async function loadProducts() {
+  const data = await fetchJSON(API.products + '/products');
+  document.getElementById('stat-products').textContent = data ? data.length : '—';
+  const grid = document.getElementById('products-grid');
+  if (!data) { grid.innerHTML = '<p class="empty">Service indisponible</p>'; return; }
+  grid.innerHTML = data.map(p => `
+    <div class="card">
+      <span class="badge">En stock</span>
+      <h3>${p.name}</h3>
+      <div class="price">${p.price} €</div>
+      <button class="btn" onclick="quickOrder(${p.id}, '${p.name}')">Commander</button>
+    </div>`).join('');
+  const sel = document.getElementById('sel-product');
+  data.forEach(p => sel.innerHTML += `<option value="${p.id}">${p.name} — ${p.price}€</option>`);
+}
+
+async function loadUsers() {
+  const data = await fetchJSON(API.users + '/users');
+  document.getElementById('stat-users').textContent = data ? data.length : '—';
+  const grid = document.getElementById('users-grid');
+  if (!data) { grid.innerHTML = '<p class="empty">Service indisponible</p>'; return; }
+  grid.innerHTML = data.map(u => `
+    <div class="card">
+      <h3>${u.name}</h3>
+      <p>${u.email}</p>
+    </div>`).join('');
+  const sel = document.getElementById('sel-user');
+  data.forEach(u => sel.innerHTML += `<option value="${u.id}">${u.name}</option>`);
+}
+
+async function loadOrders() {
+  const data = await fetchJSON(API.orders + '/orders');
+  document.getElementById('stat-orders').textContent = data ? data.length : '—';
+  const list = document.getElementById('orders-list');
+  if (!data || data.length === 0) {
+    list.innerHTML = '<p class="empty">Aucune commande pour l\'instant</p>';
+    return;
+  }
+  list.innerHTML = data.map(o => `
+    <div class="order-row">
+      <span class="order-id">#${o.id}</span>
+      <span>Utilisateur ${o.user_id} → Produit ${o.product_id}</span>
+      <span class="order-status">${o.status}</span>
+    </div>`).join('');
+}
+
+async function createOrder() {
+  const uid = document.getElementById('sel-user').value;
+  const pid = document.getElementById('sel-product').value;
+  if (!uid || !pid) { showToast('Sélectionne un utilisateur et un produit'); return; }
+  const res = await fetch(API.orders + '/orders', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({user_id: parseInt(uid), product_id: parseInt(pid)})
+  });
+  if (res.ok) { showToast('Commande créée !'); loadOrders(); }
+}
+
+async function quickOrder(pid, name) {
+  showToast('Redirige vers commandes...');
+  showTab('orders', document.querySelectorAll('.nav button')[2]);
+  setTimeout(() => { document.getElementById('sel-product').value = pid; }, 300);
+}
+
+loadProducts();
+loadUsers();
+loadOrders();
+</script>
+</body>
+</html>
+EOF
