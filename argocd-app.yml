@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pfe-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/imanesaadi/projet-pfe
+    targetRevision: HEAD
+    path: pfe-chart
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: pfe
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
