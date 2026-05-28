@@ -1,0 +1,17 @@
+namespace: pfe
+
+services:
+  - name: user-service
+    image: imanesaadi/user-service:latest
+    port: 5001
+    replicas: 2
+
+  - name: product-service
+    image: imanesaadi/product-service:latest
+    port: 5002
+    replicas: 2
+
+  - name: order-service
+    image: imanesaadi/order-service:latest
+    port: 5003
+    replicas: 2
